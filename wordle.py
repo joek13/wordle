@@ -1,10 +1,33 @@
 import typing
+import tqdm
 
 
 def load_words(wordlist_path: str = "./words.txt") -> typing.List[str]:
     """Loads wordlist from a newline-delimited file."""
     with open(wordlist_path, "r") as f:
         return [line.strip() for line in f.readlines()]
+
+
+def word_consistent(green_pairs: typing.List[typing.Tuple[int, str]], yellow_pairs: typing.List[typing.Tuple[int, str]], gray_letters: typing.Set[str], word: str):
+    """Predicate that tests whether a given word is consistent with observed:
+    - green pairs (list of (index, letter) tuples)
+    - yellow pairs (list of (index, letter) tuples)
+    - gray letters (set of letters)
+    """
+    # compute sets of green/yellow letters
+    yellow_letters = set(letter for (_, letter) in yellow_pairs)
+
+    # any guess must:
+    # - have letter l at position p for all green letter-position pairs (l, p)
+    green_matches = all(word[p] == l for (p, l) in green_pairs)
+    # - not have letter l at position p for any yellow letter-position pair (l, p)
+    yellow_mismatches = not any(word[p] == l for (p, l) in yellow_pairs)
+    # - contain letter l for all yellow letter-position pairs (l, p)
+    yellow_contains = all(l in word for l in yellow_letters)
+    # - contain no gray letters l
+    gray_absent = all(l not in word for l in gray_letters)
+
+    return green_matches and yellow_mismatches and yellow_contains and gray_absent
 
 
 def filter_possibilities(soln: str, guess: str, possibilities: typing.List[str]) -> typing.List[str]:
@@ -17,7 +40,8 @@ def filter_possibilities(soln: str, guess: str, possibilities: typing.List[str])
     # selects all (letter, position) pairs where the letters in soln and guess are equal
     green_pairs = [(p1, soln_letter) for ((p1, soln_letter), guess_letter)
                    in zip(enumerate(soln), guess) if soln_letter == guess_letter]
-    green_letters = (letter for (_, letter) in green_pairs)
+
+    green_letters = set(letter for (_, letter) in green_pairs)
 
     # selects all (letter, position) pairs where the letter l from guess is
     # - in the soln word
@@ -25,23 +49,21 @@ def filter_possibilities(soln: str, guess: str, possibilities: typing.List[str])
     # TODO: refine to consider repeated letters
     yellow_pairs = [(p, guess_letter) for (p, guess_letter) in enumerate(
         guess) if guess_letter in soln and guess_letter not in green_letters]
-    yellow_letters = (letter for (_, letter) in green_pairs)
 
     # all letters that are in the guess but not in the solution
     gray_letters = set(guess) - set(soln)
 
     def word_pred(word):
-        # any guess must:
-        # - have letter l at position p for all green letter-position pairs (l, p)
-        green_matches = all(word[p] == l for (p, l) in green_pairs)
-        # - not have letter l at position p for any yellow letter-position pair (l, p)
-        yellow_mismatches = not any(word[p] == l for (p, l) in yellow_pairs)
-        # - contain letter l for all yellow letter-position pairs (l, p)
-        yellow_contains = all(l in word for l in yellow_letters)
-        # - contain no gray letters l
-        gray_absent = all(l not in word for l in gray_letters)
+        return word_consistent(green_pairs, yellow_pairs, gray_letters, word)
 
-        return green_matches and yellow_mismatches and yellow_contains and gray_absent
+    return filter(word_pred, possibilities)
+
+
+def filter_possibilities_guess(green_pairs: typing.List[typing.Tuple[int, str]], yellow_pairs: typing.List[typing.Tuple[int, str]], gray_letters: typing.Set[str], possibilities: typing.List[str]) -> typing.List[str]:
+    """Filters possible solutions based on observed green pairs, yellow pairs, and gray letters.
+    """
+    def word_pred(word):
+        return word_consistent(green_pairs, yellow_pairs, gray_letters, word)
 
     return filter(word_pred, possibilities)
 
@@ -78,7 +100,9 @@ def next_guess(possibilities: str) -> str:
     current_minimax = None
     current_minimax_word = None
 
-    for possible_guess in possibilities:
+    print(f"Selecting best guess out of {len(possibilities)} possibilities...")
+
+    for possible_guess in tqdm.tqdm(possibilities):
         # compute worst-case space of possibilities for this guess
         score = score_guess(possibilities, possible_guess, best_score=current_minimax)
 
@@ -91,6 +115,35 @@ def next_guess(possibilities: str) -> str:
 
 
 if __name__ == "__main__":
-    words = load_words()
+    all_words = load_words()
 
-    print(next_guess(words))
+    possibilities = all_words
+    for i in range(6):
+        if i > 0:
+            guess, worst_case = next_guess(possibilities)
+            print(f"I suggest: {guess.upper()}, which leaves {worst_case} words at worst")
+
+        input_green = input("Enter the green letters, using _ for blanks: ")
+
+        assert len(input_green) == 5
+        green_pairs = [
+            (position, letter.lower()) for (position, letter) in enumerate(input_green) if letter.isalpha()
+        ]
+
+        input_yellow = input("Enter the yellow letters, using _ for blanks: ")
+
+        assert len(input_yellow) == 5
+        yellow_pairs = [
+            (position, letter.lower()) for (position, letter) in enumerate(input_yellow) if letter.isalpha()
+        ]
+
+        input_gray = input("Enter the gray letters, using _ for blanks: ")
+        gray_letters = set(letter.lower() for letter in input_gray if letter.isalpha())
+
+        possibilities = list(filter_possibilities_guess(green_pairs, yellow_pairs, gray_letters, possibilities))
+
+        if len(possibilities) == 1:
+            print("The word is:", possibilities[0].upper())
+            break
+        elif len(possibilities) < 1:
+            print("The puzzle is impossible! Perhaps you entered results incorrectly?")
