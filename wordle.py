@@ -123,21 +123,21 @@ if __name__ == "__main__":
             guess, worst_case = next_guess(possibilities)
             print(f"I suggest: {guess.upper()}, which leaves {worst_case} words at worst")
 
-        input_green = input("Enter the green letters, using _ for blanks: ")
+        input_green = input("Enter the green letters, using _ for blanks:   ")
 
         assert len(input_green) == 5
         green_pairs = [
             (position, letter.lower()) for (position, letter) in enumerate(input_green) if letter.isalpha()
         ]
 
-        input_yellow = input("Enter the yellow letters, using _ for blanks: ")
+        input_yellow = input("Enter the yellow letters, using _ for blanks:  ")
 
         assert len(input_yellow) == 5
         yellow_pairs = [
             (position, letter.lower()) for (position, letter) in enumerate(input_yellow) if letter.isalpha()
         ]
 
-        input_gray = input("Enter the gray letters, using _ for blanks: ")
+        input_gray = input("Enter the gray letters, using _ for blanks:    ")
         gray_letters = set(letter.lower() for letter in input_gray if letter.isalpha())
 
         possibilities = list(filter_possibilities_guess(green_pairs, yellow_pairs, gray_letters, possibilities))
