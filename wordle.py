@@ -119,9 +119,8 @@ if __name__ == "__main__":
 
     possibilities = all_words
     for i in range(6):
-        if i > 0:
-            guess, worst_case = next_guess(possibilities)
-            print(f"I suggest: {guess.upper()}, which leaves {worst_case} words at worst")
+        guess, worst_case = next_guess(possibilities)
+        print(f"I suggest: {guess.upper()}, which leaves {worst_case} words at worst")
 
         input_green = input("Enter the green letters, using _ for blanks:   ")
 
