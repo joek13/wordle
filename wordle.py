@@ -1,3 +1,4 @@
+import re
 import typing
 import tqdm
 
@@ -22,7 +23,7 @@ def word_consistent(green_pairs: typing.List[PositionLetterPair],
     - gray letters (set of letters)
     """
     def pred(word):
-        # any guess must:
+        # any viable solution must:
         # - have letter l at position p for all green position-letter pairs (l, p)
         green_matches = all(word[p] == l for (p, l) in green_pairs)
         # - not have letter l at position p for any yellow position-letter pair (l, p)
@@ -64,59 +65,46 @@ def generate_feedback(soln: str, guess: str) -> typing.Tuple[typing.List[Positio
     return green_pairs, yellow_pairs, gray_letters
 
 
-def score_guess(possibilities: str, guess: str, best_score: int = None):
-    """Computes the size of the largest possible space of viable solutions under any single
-    solution.
-
-    For every given possible solution,
-        compute how many words remain after using this guess against that solution.
-
-    Returns the largest space of viable solutions under each solution.
-
-    The "max" part of minimax.
+def select_guess(candidates: str) -> typing.Tuple[str, int]:
+    """Selects guess among candidates based on minimax decision rule.
+    Returns tuple of (word, max), where word is the guess, and max is
+    the maximum possible of remaining candidates after guessing `word`.
     """
-    # returns the size largest possible space of possible words under any possible solution
-
-    max_possibilities = -1
-    for possible_soln in possibilities:
-        feedback = generate_feedback(possible_soln, guess)  # gets green pairs, yellow pairs, gray letters
-        # filters possibilities to those consistent with this feedback and counts them
-        remaining = len(list(filter(word_consistent(*feedback), possibilities)))
-
-        if best_score is not None and remaining > best_score:
-            # abort search, since it is already higher than the current lowest.
-            return remaining
-
-        if remaining > max_possibilities:
-            max_possibilities = remaining
-
-    assert max_possibilities != -1
-    return max_possibilities
-
-
-def select_guess(possibilities: str) -> str:
     current_minimax = None
     current_minimax_word = None
 
-    print(f"Selecting best guess out of {len(possibilities)} possibilities...")
+    print(f"Selecting best guess from {len(candidates)} possibilities...")
 
-    for possible_guess in tqdm.tqdm(possibilities):
-        # compute worst-case space of possibilities for this guess
-        score = score_guess(possibilities, possible_guess, best_score=current_minimax)
+    for guess in tqdm.tqdm(candidates):
+        # max loss for this guess
+        maximum_remaining = None
+        for possible_soln in candidates:
+            # feedback guessing `guess` when the solution is `soln`
+            feedback = generate_feedback(possible_soln, guess)
+            # how many words remain after incorporating this feedback
+            remaining = len(list(filter(word_consistent(*feedback), candidates)))
 
-        # update running minimax if appropriate
-        if current_minimax is None or score < current_minimax:
-            current_minimax = score
-            current_minimax_word = possible_guess
+            # is this a new maximum loss?
+            if maximum_remaining is None or remaining > maximum_remaining:
+                maximum_remaining = remaining
 
-    return (current_minimax_word, current_minimax)
+            if current_minimax is not None and maximum_remaining > current_minimax:
+                # the maximum for this guess is larger than the current minimax
+                # not possible that this word represents a minimax, we can break early
+                break
+
+        if current_minimax is None or maximum_remaining < current_minimax:
+            current_minimax = maximum_remaining
+            current_minimax_word = guess
+
+    return current_minimax_word, current_minimax
 
 
 if __name__ == "__main__":
-    all_words = load_words()
+    all_words = load_words()  # load words from file
 
     possibilities = all_words
-    for i in range(6):
+    while True:
         guess, worst_case = select_guess(possibilities)
         print(f"I suggest: {guess.upper()}, which leaves {worst_case} words at worst")
 
