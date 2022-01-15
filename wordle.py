@@ -18,11 +18,7 @@ PositionLetterPair = typing.Tuple[int, str]
 def word_consistent(green_pairs: typing.List[PositionLetterPair],
                     yellow_pairs: typing.List[PositionLetterPair],
                     gray_pairs: typing.List[PositionLetterPair]) -> typing.Callable[[str], bool]:
-    """Returns a predicate testing whether a given word is consistent with observed:
-    - green pairs (list of (position, letter) tuples)
-    - yellow pairs (list of (position, letter) tuples)
-    - gray letters (set of letters)
-    """
+    """Returns a predicate testing whether a given word is consistent with observed feedback."""
     def pred(word):
         # count the letters in word
         letter_counts = collections.Counter()
@@ -101,8 +97,10 @@ def generate_feedback(soln: str, guess: str) -> typing.Tuple[typing.List[Positio
     return green_pairs, yellow_pairs, gray_pairs
 
 
-def select_guess(guesses: typing.List[str], candidates: typing.List[str]) -> typing.Tuple[str, int]:
-    """Selects guess among candidates based on minimax decision rule.
+def select_guess(guesses: typing.List[str],
+                 candidates: typing.List[str]) -> typing.Tuple[str, int]:
+    """Selects a guess based on minimax decision rule.
+
     Returns tuple of (word, max), where word is the guess, and max is
     the maximum possible of remaining candidates after guessing `word`.
     """
@@ -137,14 +135,14 @@ def select_guess(guesses: typing.List[str], candidates: typing.List[str]) -> typ
 
 
 if __name__ == "__main__":
-    solutions = load_words("./solutions.txt")  # load possible solution words
-    guesses = solutions + load_words("./guesses.txt")  # load additional guess words
+    all_solutions = load_words("./solutions.txt")  # load possible solution words
+    all_guesses = all_solutions + load_words("./guesses.txt")  # load additional guess words
 
     # initialize space of possibilties to all puzzle solutions
-    possibilities = solutions
+    possibilities = all_solutions
     for i in range(6):
         if i > 0:
-            guess, worst_case = select_guess(guesses, possibilities)
+            guess, worst_case = select_guess(all_guesses, possibilities)
         else:
             # hard-code first guess to save on processing time
             guess, worst_case = "arise", 168  # values obtained simply by running the code without this optimization
@@ -179,3 +177,4 @@ if __name__ == "__main__":
             break
         elif len(possibilities) < 1:
             print("The puzzle is impossible! Perhaps you entered results incorrectly?")
+            break
