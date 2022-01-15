@@ -1,4 +1,5 @@
 import re
+import collections
 import typing
 import tqdm
 
@@ -16,53 +17,88 @@ PositionLetterPair = typing.Tuple[int, str]
 
 def word_consistent(green_pairs: typing.List[PositionLetterPair],
                     yellow_pairs: typing.List[PositionLetterPair],
-                    gray_letters: typing.Set[str]) -> typing.Callable[[str], bool]:
+                    gray_pairs: typing.List[PositionLetterPair], debug=False) -> typing.Callable[[str], bool]:
     """Returns a predicate testing whether a given word is consistent with observed:
     - green pairs (list of (position, letter) tuples)
     - yellow pairs (list of (position, letter) tuples)
     - gray letters (set of letters)
     """
     def pred(word):
-        # any viable solution must:
-        # - have letter l at position p for all green position-letter pairs (l, p)
-        green_matches = all(word[p] == l for (p, l) in green_pairs)
-        # - not have letter l at position p for any yellow position-letter pair (l, p)
-        yellow_mismatches = not any(word[p] == l for (p, l) in yellow_pairs)
-        # - contain letter l for all yellow position-letter pairs (l, p)
-        yellow_letters = set(letter for (_, letter) in yellow_pairs)
-        yellow_contains = all(l in word for l in yellow_letters)
-        # - contain no gray letters l
-        gray_absent = all(l not in word for l in gray_letters)
+        # count the letters in word
+        letter_counts = collections.Counter()
+        for letter in word:
+            letter_counts[letter] += 1
 
-        return green_matches and yellow_mismatches and yellow_contains and gray_absent
+        # any viable solution must:
+        # have letter l at position p for any green pair (p, l)
+        for (p, l) in green_pairs:
+            if word[p] != l:
+                # green pair does not match
+                return False
+            else:
+                letter_counts[l] -= 1
+
+        # not have letter l at position p for any yellow pair (p, l)
+        for (p, l) in yellow_pairs:
+            if word[p] == l:
+                # letter does match, but it shoudn't
+                return False
+            else:  # ...and contain letter l somewhere, aside from a green space
+                # doesn't contain this letter,
+                # or perhaps doesn't contain it enough times
+                if letter_counts[l] <= 0:
+                    return False
+                else:
+                    letter_counts[l] -= 1
+
+        # contain no gray letters
+        for (p, l) in gray_pairs:
+            if letter_counts[l] != 0:
+                return False
+
+        return True
 
     return pred
 
 
-def generate_feedback(soln: str, guess: str) -> typing.Tuple[typing.List[PositionLetterPair], typing.List[PositionLetterPair], typing.Set[str]]:
+def generate_feedback(soln: str, guess: str) -> typing.Tuple[typing.List[PositionLetterPair],
+                                                             typing.List[PositionLetterPair],
+                                                             typing.List[PositionLetterPair]]:
     """Returns the feedback from guessing `guess` when the solution is `soln`.
     The feedback is returned as a tuple of (green (pos, letter) pairs, yellow (pos, letter) pairs, set of gray letters)
     """
     # sanity check
     assert len(soln) == len(guess)
 
+    # counts all the letters in the solution word
+    letter_counts = collections.Counter()
+    for letter in soln:
+        letter_counts[letter] += 1
+
     # selects all (position, letter) pairs where the letters in soln and guess are equal
     green_pairs = [(p1, soln_letter) for ((p1, soln_letter), guess_letter)
                    in zip(enumerate(soln), guess) if soln_letter == guess_letter]
 
-    green_letters = set(letter for (_, letter) in green_pairs)
+    # subtract the green letters from the letter counts,
+    # so we can only mark yellow letters if they are left over.
+    # reason: if the word is GEEKS, and we guess LEDEE (is that even a word?)
+    # the first E should be green, the second yellow, and the third gray.
+    for (_, letter) in green_pairs:
+        letter_counts[letter] -= 1
 
-    # selects all (position, letter) pairs where the letter l from guess is
-    # - in the soln word
-    # - but not in the set of green letters
+    yellow_pairs = []
+    for pos, letter in enumerate(guess):
+        # there are excess letters that aren't already marked green
+        if letter_counts[letter] > 0:
+            # append this pair
+            yellow_pairs.append((pos, letter))
+            # subtract one from excess letter count
+            letter_counts[letter] -= 1
 
-    yellow_pairs = [(p, guess_letter) for (p, guess_letter) in enumerate(
-        guess) if guess_letter in soln and guess_letter not in green_letters]
+    # all remaining pairs are gray
+    gray_pairs = [(p, l) for (p, l) in enumerate(guess) if (p, l) not in green_pairs and (p, l) not in yellow_pairs]
 
-    # all letters that are in the guess but not in the solution
-    gray_letters = set(guess) - set(soln)
-
-    return green_pairs, yellow_pairs, gray_letters
+    return green_pairs, yellow_pairs, gray_pairs
 
 
 def select_guess(candidates: str) -> typing.Tuple[str, int]:
@@ -104,7 +140,7 @@ if __name__ == "__main__":
     all_words = load_words()  # load words from file
 
     possibilities = all_words
-    while True:
+    for i in range(6):
         guess, worst_case = select_guess(possibilities)
         print(f"I suggest: {guess.upper()}, which leaves {worst_case} words at worst")
 
@@ -123,9 +159,12 @@ if __name__ == "__main__":
         ]
 
         input_gray = input("Enter the gray letters, using _ for blanks:    ")
-        gray_letters = set(letter.lower() for letter in input_gray if letter.isalpha())
+        assert len(input_gray) == 5
+        gray_pairs = [
+            (position, letter.lower()) for (position, letter) in enumerate(input_gray) if letter.isalpha()
+        ]
 
-        pred = word_consistent(green_pairs, yellow_pairs, gray_letters)
+        pred = word_consistent(green_pairs, yellow_pairs, gray_pairs, debug=True)
         possibilities = list(filter(pred, possibilities))
 
         if len(possibilities) == 1:
