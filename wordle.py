@@ -4,7 +4,7 @@ import typing
 import tqdm
 
 
-def load_words(wordlist_path: str = "./words.txt") -> typing.List[str]:
+def load_words(wordlist_path: str) -> typing.List[str]:
     """Loads wordlist from a newline-delimited file."""
     with open(wordlist_path, "r") as f:
         return [line.strip() for line in f.readlines()]
@@ -17,7 +17,7 @@ PositionLetterPair = typing.Tuple[int, str]
 
 def word_consistent(green_pairs: typing.List[PositionLetterPair],
                     yellow_pairs: typing.List[PositionLetterPair],
-                    gray_pairs: typing.List[PositionLetterPair], debug=False) -> typing.Callable[[str], bool]:
+                    gray_pairs: typing.List[PositionLetterPair]) -> typing.Callable[[str], bool]:
     """Returns a predicate testing whether a given word is consistent with observed:
     - green pairs (list of (position, letter) tuples)
     - yellow pairs (list of (position, letter) tuples)
@@ -101,7 +101,7 @@ def generate_feedback(soln: str, guess: str) -> typing.Tuple[typing.List[Positio
     return green_pairs, yellow_pairs, gray_pairs
 
 
-def select_guess(candidates: str) -> typing.Tuple[str, int]:
+def select_guess(guesses: typing.List[str], candidates: typing.List[str]) -> typing.Tuple[str, int]:
     """Selects guess among candidates based on minimax decision rule.
     Returns tuple of (word, max), where word is the guess, and max is
     the maximum possible of remaining candidates after guessing `word`.
@@ -109,9 +109,9 @@ def select_guess(candidates: str) -> typing.Tuple[str, int]:
     current_minimax = None
     current_minimax_word = None
 
-    print(f"Selecting best guess from {len(candidates)} possibilities...")
+    print(f"Selecting best guess from {len(guesses)} possibilities...")
 
-    for guess in tqdm.tqdm(candidates):
+    for guess in tqdm.tqdm(guesses):
         # max loss for this guess
         maximum_remaining = None
         for possible_soln in candidates:
@@ -137,11 +137,18 @@ def select_guess(candidates: str) -> typing.Tuple[str, int]:
 
 
 if __name__ == "__main__":
-    all_words = load_words()  # load words from file
+    solutions = load_words("./solutions.txt")  # load possible solution words
+    guesses = solutions + load_words("./guesses.txt")  # load additional guess words
 
-    possibilities = all_words
+    # initialize space of possibilties to all puzzle solutions
+    possibilities = solutions
     for i in range(6):
-        guess, worst_case = select_guess(possibilities)
+        if i > 0:
+            guess, worst_case = select_guess(guesses, possibilities)
+        else:
+            # hard-code first guess to save on processing time
+            guess, worst_case = "arise", 168  # values obtained simply by running the code without this optimization
+
         print(f"I suggest: {guess.upper()}, which leaves {worst_case} words at worst")
 
         input_green = input("Enter the green letters, using _ for blanks:   ")
@@ -164,7 +171,7 @@ if __name__ == "__main__":
             (position, letter.lower()) for (position, letter) in enumerate(input_gray) if letter.isalpha()
         ]
 
-        pred = word_consistent(green_pairs, yellow_pairs, gray_pairs, debug=True)
+        pred = word_consistent(green_pairs, yellow_pairs, gray_pairs)
         possibilities = list(filter(pred, possibilities))
 
         if len(possibilities) == 1:
