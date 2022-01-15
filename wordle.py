@@ -76,9 +76,7 @@ def generate_feedback(soln: str, guess: str) -> typing.Tuple[typing.List[Positio
                    in zip(enumerate(soln), guess) if soln_letter == guess_letter]
 
     # subtract the green letters from the letter counts,
-    # so we can only mark yellow letters if they are left over.
-    # reason: if the word is GEEKS, and we guess LEDEE (is that even a word?)
-    # the first E should be green, the second yellow, and the third gray.
+    # since green letters "use up" letters from the solution word.
     for (_, letter) in green_pairs:
         letter_counts[letter] -= 1
 
@@ -88,11 +86,11 @@ def generate_feedback(soln: str, guess: str) -> typing.Tuple[typing.List[Positio
         if letter_counts[letter] > 0:
             # append this pair
             yellow_pairs.append((pos, letter))
-            # subtract one from excess letter count
+            # subtract one from excess letter count; yellow letters "use up" solution word letters.
             letter_counts[letter] -= 1
 
     # all remaining pairs are gray
-    gray_pairs = [(p, l) for (p, l) in enumerate(guess) if (p, l) not in green_pairs and (p, l) not in yellow_pairs]
+    gray_pairs = [pair for pair in enumerate(guess) if pair not in green_pairs and pair not in yellow_pairs]
 
     return green_pairs, yellow_pairs, gray_pairs
 
@@ -138,11 +136,11 @@ if __name__ == "__main__":
     all_solutions = load_words("./solutions.txt")  # load possible solution words
     all_guesses = all_solutions + load_words("./guesses.txt")  # load additional guess words
 
-    # initialize space of possibilties to all puzzle solutions
-    possibilities = all_solutions
+    # initialize space of candidates to all puzzle solutions
+    candidates = all_solutions
     for i in range(6):
         if i > 0:
-            guess, worst_case = select_guess(all_guesses, possibilities)
+            guess, worst_case = select_guess(all_guesses, candidates)
         else:
             # hard-code first guess to save on processing time
             guess, worst_case = "arise", 168  # values obtained simply by running the code without this optimization
@@ -170,11 +168,11 @@ if __name__ == "__main__":
         ]
 
         pred = word_consistent(green_pairs, yellow_pairs, gray_pairs)
-        possibilities = list(filter(pred, possibilities))
+        candidates = list(filter(pred, candidates))
 
-        if len(possibilities) == 1:
-            print("The word is:", possibilities[0].upper())
+        if len(candidates) == 1:
+            print("The word is:", candidates[0].upper())
             break
-        elif len(possibilities) < 1:
+        elif len(candidates) < 1:
             print("The puzzle is impossible! Perhaps you entered results incorrectly?")
             break
