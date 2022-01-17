@@ -83,7 +83,7 @@ def generate_feedback(soln: str, guess: str) -> typing.Tuple[typing.List[Positio
     yellow_pairs = []
     for pos, letter in enumerate(guess):
         # there are excess letters that aren't already marked green
-        if letter_counts[letter] > 0:
+        if letter_counts[letter] > 0 and (pos, letter) not in green_pairs:
             # append this pair
             yellow_pairs.append((pos, letter))
             # subtract one from excess letter count; yellow letters "use up" solution word letters.
